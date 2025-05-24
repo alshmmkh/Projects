@@ -1,0 +1,365 @@
+---
+title: "Project R Codes"
+author: 
+date: "6/9/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Appendix
+
+<br  />
+
+### Figure 1. (Forward Selection Plot)
+
+```{r, echo= FALSE}
+DataTotal = ex1220
+DataTotal$Subject = c(1:30)
+# Taking out 5 observations randomly to use them for predection.
+# sample(DataTotal$Subject, 5, replace = FALSE)
+#  Here is the output: [1] 17 13 21 25 30
+# Deleting subjects 17, 13, 21, 25,and 30
+DataTotal <- DataTotal[-c(17,13,21,25,30), ]
+
+forward <- regsubsets(Total ~ Area + Elev + DistNear + DistSc + AreaNear, data = DataTotal, nbest = 7, method = "forward")
+plot(forward)
+```
+
+### Figure 2. (Backward Selection Plot)
+
+```{r, echo= FALSE}
+backward <- regsubsets(Total ~ Area + Elev + DistNear + DistSc + AreaNear, data = ex1220, nbest = 7, method = "backward")
+plot(backward)
+```
+
+###  Figure 3. ( Data Matrix )
+
+```{r, echo= FALSE}
+ggpairs(DataTotal[, c(-1,-9)])
+ # Note: c(-1,-9) to not include Island and Subject columns
+```
+
+
+```{r, include= FALSE}
+min(ex1220$Native/ex1220$Total)
+max(ex1220$Native/ex1220$Total)
+# Note: Native accounts for 21% to 100% of Total, subset of Total
+#        Therefore, it's not practical to use use Native
+```
+
+
+```{r, include= FALSE}
+# Choosing the best model
+backward <- regsubsets(Total ~ Area + Elev + DistNear + DistSc + AreaNear, data = DataTotal, nbest = 7, method = "backward")
+cp <- summary(backward)$cp
+bic <- summary(backward)$bic
+size <- apply(summary(backward)$which, 1, sum)
+results <- list(summary(backward)$which[which.min(cp),],
+                cp = summary(backward)$cp[which.min(cp)], bic = summary(backward)$bic[which.min(cp)])
+results
+# all methods,["exhaustive","backward", "forward", "seqrep"], yeild the following :
+#(Intercept)        Area        Elev    DistNear      DistSc    AreaNear 
+       # TRUE       FALSE        TRUE       FALSE       FALSE        TRUE 
+```
+
+<br  />
+
+## Using The Best Fit  
+
+<br  />
+
+```{r}
+fit1 = lm(Total ~ Elev+ AreaNear, data = DataTotal)
+summary(fit1)
+DataTotal <- fortify(fit1, DataTotal)
+```
+
+<br  />
+
+## Checking Best Fit Graphs
+
+<br  />
+
+### Figure 4. (Residual Plot)
+
+<br  />
+
+```{r}
+# Residual Plot
+qplot(.fitted, .resid, data = DataTotal) + geom_hline(yintercept = 0)
+  # Note1: the variance is not constant
+```
+
+
+<br  />
+
+### Figure 5. (Box-Cox Transformation Plot)
+
+<br  />
+
+```{r}
+# Box-Cox Transformation
+boxcox(fit1) 
+  # No log Transformation since lamda is not 0
+```
+
+<br  />
+
+## Transformation Of The Response Variable 
+
+<br  />
+
+$$T(y) = \left\{
+        \begin{array}{ll}
+            \frac{y^\lambda -1}{\lambda},  & \quad \lambda \neq 0 \\
+            \log(y) & \quad \lambda = 0
+        \end{array}
+    \right.$$
+
+<br  />
+
+```{r}
+# Using lamda = 0.5 from the 95% C.I, we do the following Transformation 
+DataTotal$Total_Transformed = 2*(sqrt(DataTotal$Total)-1)
+fit2 = lm(Total_Transformed ~ Elev+ AreaNear, data = DataTotal)
+summary(fit2)
+DataTotal_Transformed <- fortify(fit2, DataTotal)
+```
+
+<br  />
+
+## Checking The Graphs After Transformation
+
+<br  />
+
+### Figure 6. (Residual Plot After Transformation)
+
+<br  />
+
+```{r}
+# Residual Plot
+qplot(.fitted, .resid, data = DataTotal_Transformed) + geom_hline(yintercept = 0)
+# Note1: Variance looks better
+# # Note2: there is no pattren, so the data is linear
+```
+
+<br  />
+
+### Figure 7. (QQplot After Transformation)
+
+<br  />
+
+```{r}
+qqnorm(DataTotal_Transformed$.resid); qqline(DataTotal_Transformed$.resid)
+```
+
+<br  />
+
+### Reordering The Data
+
+<br  />
+
+```{r}
+# reordering the data
+DataTotal_Transformed$Subject = c(1:25)
+```
+
+<br  />
+
+### Figure 8. (Case Statistics On Transformed Response)
+
+<br  />
+
+```{r}
+p1 <- qplot(Subject,.hat, data = DataTotal_Transformed)
+# Above (2*2)/25 =  0.16 is high leverage
+p2 <- qplot(Subject,.stdresid, data = DataTotal_Transformed)
+# between [-2,2] is good 
+p3 <- qplot(Subject,.cooksd, data = DataTotal_Transformed)
+# above 1 is high
+multiplot(p1,p2,p3,cols=1)
+  # Note1: Subjects number 15 is influential and have high leverage 
+  # Note2: 12 has high leverage too, but it's not influential, below 1
+  # Note3: approximately most data are within [-2,2] on the second graph, so no High residuals
+```
+
+<br  />
+
+## Deleting Subject 15
+
+<br  />
+
+```{r}
+DataTotal_Transformed_no_15 <- DataTotal_Transformed[-15, ]
+```
+
+<br  />
+
+## Using The Transformed Best Fit Without 15
+
+<br  />
+
+```{r}
+fit3 = lm(Total_Transformed ~ Elev+ AreaNear, data = DataTotal_Transformed_no_15)
+summary(fit3)
+DataTotal_Transformed_no_15 <- fortify(fit3, DataTotal_Transformed_no_15)
+```
+
+<br  />
+
+## Checking The Graphs After Transformation And Removing Observation 15
+
+<br  />
+
+### Figure 9. (Residual Plot After Transformation And Removing Observation 15)
+
+<br  />
+
+```{r}
+qplot(.fitted, .resid, data = DataTotal_Transformed_no_15) + geom_hline(yintercept = 0)
+# still looks good
+```
+
+<br  />
+
+### Figure 10. (QQplot Plot After Transformation And Removing Observation 15)
+
+<br  />
+
+```{r}
+qqnorm(DataTotal_Transformed_no_15$.resid); qqline(DataTotal_Transformed_no_15$.resid)
+# looks better than before eventhough we have less observations
+```
+
+<br  />
+
+### Reordering The Data
+
+<br  />
+
+```{r}
+# reordering the data
+DataTotal_Transformed_no_15$Subject = c(1:24)
+```
+
+<br  />
+
+### Figure 11. (Case Statistics With Transformed Response After Removing Observation 15)
+
+<br  />
+
+```{r}
+p1 <- qplot(Subject,.hat, data = DataTotal_Transformed_no_15)
+# Above (2*2)/24 =   0.1666667 is high leverage
+p2 <- qplot(Subject,.stdresid, data = DataTotal_Transformed_no_15)
+# between [-2,2] is good 
+p3 <- qplot(Subject,.cooksd, data = DataTotal_Transformed_no_15)
+# above 1 is high
+multiplot(p1,p2,p3,cols=1)
+# Note: The only influential observation is 12. We remove it since it has high leverage
+```
+
+<br  />
+
+## Deleting Subject 12
+
+<br  />
+
+```{r}
+DataTotal_Transformed_no_12_15 <- DataTotal_Transformed_no_15[-12, ]
+```
+
+<br  />
+
+## Using The Transformed Best Fit Without 12 and 15
+
+<br  />
+
+```{r}
+fit4 = lm(Total_Transformed ~ Elev+ AreaNear, data = DataTotal_Transformed_no_12_15)
+summary(fit4)
+DataTotal_Transformed_no_12_15 <- fortify(fit4, DataTotal_Transformed_no_12_15)
+```
+
+<br  />
+
+## Checking The Graphs After Transformation And Removing Observations 12 and 15
+
+<br  />
+
+### Figure 12. (Residual Plot After Transformation And Removing Observations 15 And 12)
+
+<br  />
+
+```{r}
+qplot(.fitted, .resid, data = DataTotal_Transformed_no_12_15) + geom_hline(yintercept = 0)
+# still looks good
+```
+
+<br  />
+
+### Figure 13. (QQplot Plot After Transformation And Removing Observations 12 And 15)
+
+<br  />
+
+```{r}
+qqnorm(DataTotal_Transformed_no_12_15$.resid); qqline(DataTotal_Transformed_no_12_15$.resid)
+# Eventhough we only used 23 observations at this point, the plot looks good.
+```
+
+<br  />
+
+### Reordering The Data
+
+<br  />
+
+```{r}
+# reordering the data
+DataTotal_Transformed_no_12_15$Subject = c(1:23)
+```
+
+<br  />
+
+### Figure 13. (Case Statistics With Transformed Response After Removing Observations 12 And 15)
+
+<br  />
+
+```{r}
+
+p1 <- qplot(Subject,.hat, data = DataTotal_Transformed_no_12_15)
+# Above (2*2)/23 =  0.173913 is high leverage
+p2 <- qplot(Subject,.stdresid, data = DataTotal_Transformed_no_12_15)
+# between [-2,2] is good 
+p3 <- qplot(Subject,.cooksd, data = DataTotal_Transformed_no_12_15)
+# above 1 is high
+multiplot(p1,p2,p3,cols=1)
+# Note: there are some points with high leverage; however, none of them is an influential point
+```
+
+<br  />
+
+## Predicting The Five Observations Using The Transformed Best Fit Without 12 and 15
+
+<br  />
+
+```{r}
+# Using the deleted data for predection
+newdata = ex1220[c(17,13,21,25,30),c(5,8)]
+# 5 and 8 are the Elev and AreaNear respectively
+
+# Note1: This is the data before transforming it back
+# Note2: Here we are talking about the median not the mean, since we used square root transformation
+predict(fit4, newdata, interval = "prediction")
+
+# Transforming the data back and comparing the medians with their intervals with the actual data
+((predict(fit4, newdata, interval = "prediction")[,]/2)+1)^2
+# to compare with original Totals
+ex1220[c(17,13,21,25,30),2]
+
+# all values have been captured in the 95% predection intervals 
+
+
+```
